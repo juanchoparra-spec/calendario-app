@@ -1,0 +1,24 @@
+{
+  "name": "CalendarIQ",
+  "short_name": "CalendarIQ",
+  "description": "Calendario semanal de earnings y reuniones de la FED",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#EAF1FA",
+  "theme_color": "#0C2340",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

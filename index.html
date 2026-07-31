@@ -94,6 +94,27 @@
   }
   .empty-state{text-align:center;color:var(--gray-text);font-size:13px;padding:2rem 0;}
   .loading{text-align:center;color:var(--gray-text);font-size:13px;padding:2rem 0;}
+  .suggest-box{
+    position:absolute;top:48px;left:0;right:52px;background:var(--card);
+    border:1.5px solid var(--border);border-radius:12px;z-index:20;
+    max-height:280px;overflow-y:auto;box-shadow:0 6px 16px rgba(12,35,64,0.15);
+    display:none;
+  }
+  .suggest-box.open{display:block;}
+  .suggest-item{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;
+    border-bottom:1px solid var(--gray-light);
+  }
+  .suggest-item:last-child{border-bottom:none;}
+  .suggest-logo{
+    width:30px;height:30px;border-radius:7px;background:var(--gray-light);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;
+  }
+  .suggest-logo img{width:100%;height:100%;object-fit:contain;}
+  .suggest-logo span{font-size:9px;font-weight:700;color:var(--gray-text);}
+  .suggest-text{display:flex;flex-direction:column;overflow:hidden;}
+  .suggest-sym{font-size:13px;font-weight:700;}
+  .suggest-name{font-size:11px;color:var(--gray-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 </style>
 </head>
 <body>
@@ -105,9 +126,10 @@
 
   <div class="weeks" id="weekTabs"></div>
 
-  <div class="toolbar">
-    <input type="text" id="searchInput" placeholder="Buscar ticker, ej. AVGO">
+  <div class="toolbar" style="position:relative;">
+    <input type="text" id="searchInput" placeholder="Buscar ticker o empresa" autocomplete="off">
     <button id="refreshBtn" title="Actualizar">&#8635;</button>
+    <div id="suggestBox" class="suggest-box"></div>
   </div>
 
   <div id="fomcArea"></div>
@@ -266,7 +288,6 @@ async function loadWeek(force){
   refreshBtn.classList.add("spinning");
 
   const {start, end} = weekRange(currentWeek);
-  const searchVal = document.getElementById("searchInput").value.trim().toUpperCase();
 
   let earningsPayload, usedCache = true;
   try{
@@ -313,10 +334,6 @@ async function loadWeek(force){
   const raw = (earningsPayload.data && earningsPayload.data.earningsCalendar) || [];
   let filtered = raw.filter(item => allowed.has((item.symbol||"").toUpperCase()));
 
-  if(searchVal){
-    filtered = filtered.filter(item => item.symbol.toUpperCase().includes(searchVal));
-  }
-
   // Group by date
   const byDate = {};
   filtered.forEach(item=>{
@@ -354,16 +371,82 @@ document.getElementById("refreshBtn").addEventListener("click", ()=>{
   loadWeek(true);
 });
 
+async function searchSymbols(query){
+  const cacheKey = "search_" + query;
+  const cached = cacheGet(cacheKey);
+  if(cached && (Date.now() - cached.fetchedAt) < 24 * 60 * 60 * 1000){
+    return cached.results;
+  }
+  try{
+    const url = BASE + "/search?q=" + encodeURIComponent(query) + "&token=" + FINNHUB_KEY;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("search_failed");
+    const data = await res.json();
+    const results = (data.result || [])
+      .filter(r => r.type === "Common Stock" && !r.symbol.includes("."))
+      .slice(0, 8);
+    cacheSet(cacheKey, { results, fetchedAt: Date.now() });
+    return results;
+  }catch(e){
+    return [];
+  }
+}
+
+async function renderSuggestions(query){
+  const box = document.getElementById("suggestBox");
+  if(!query || query.length < 1){
+    box.classList.remove("open");
+    box.innerHTML = "";
+    return;
+  }
+  const results = await searchSymbols(query);
+  if(results.length === 0){
+    box.classList.remove("open");
+    box.innerHTML = "";
+    return;
+  }
+  box.innerHTML = "";
+  for(const r of results){
+    const item = document.createElement("div");
+    item.className = "suggest-item";
+    const logoUrl = await fetchLogo(r.symbol);
+    item.innerHTML = `
+      <div class="suggest-logo">${logoUrl ? `<img src="${logoUrl}" alt="${r.symbol}">` : `<span>${r.symbol.slice(0,4)}</span>`}</div>
+      <div class="suggest-text">
+        <span class="suggest-sym">${r.symbol}</span>
+        <span class="suggest-name">${r.description || ""}</span>
+      </div>
+    `;
+    item.onclick = ()=>{
+      const sym = r.symbol.toUpperCase();
+      if(!WATCHLIST.includes(sym) && !extraSearched.includes(sym)){
+        extraSearched.push(sym);
+      }
+      document.getElementById("searchInput").value = "";
+      box.classList.remove("open");
+      box.innerHTML = "";
+      loadWeek(false);
+    };
+    box.appendChild(item);
+  }
+  box.classList.add("open");
+}
+
 let searchTimeout;
 document.getElementById("searchInput").addEventListener("input", (e)=>{
   clearTimeout(searchTimeout);
-  const val = e.target.value.trim().toUpperCase();
+  const val = e.target.value.trim();
   searchTimeout = setTimeout(()=>{
-    if(val && !WATCHLIST.includes(val) && !extraSearched.includes(val)){
-      extraSearched.push(val);
-    }
-    loadWeek(false);
-  }, 500);
+    renderSuggestions(val);
+  }, 400);
+});
+
+document.addEventListener("click", (e)=>{
+  const box = document.getElementById("suggestBox");
+  const input = document.getElementById("searchInput");
+  if(e.target !== box && !box.contains(e.target) && e.target !== input){
+    box.classList.remove("open");
+  }
 });
 
 renderWeekTabs();

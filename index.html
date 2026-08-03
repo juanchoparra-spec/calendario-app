@@ -70,10 +70,10 @@
   .day-label{font-size:15px;font-weight:600;margin:0 0 8px;color:var(--text);}
   .day-block{margin-bottom:14px;}
   .ticker-card{
-    display:flex;align-items:center;justify-content:space-between;
     background:var(--card);border:1.5px solid var(--border);border-radius:12px;
     padding:10px 12px;margin-bottom:8px;
   }
+  .ticker-row{display:flex;align-items:center;justify-content:space-between;}
   .ticker-left{display:flex;align-items:center;gap:10px;}
   .ticker-logo{
     width:34px;height:34px;border-radius:8px;background:var(--gray-light);
@@ -81,7 +81,17 @@
   }
   .ticker-logo img{width:100%;height:100%;object-fit:contain;}
   .ticker-logo span{font-size:10px;font-weight:700;color:var(--gray-text);}
-  .ticker-sym{font-size:14px;font-weight:600;}
+  .ticker-sym{font-size:14px;font-weight:600;display:block;}
+  .vol-badge{
+    font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px;
+    margin-top:2px;
+  }
+  .vol-badge.high{color:#B8452F;}
+  .vol-badge.mid{color:#B8860B;}
+  .eps-line{
+    font-size:11px;color:var(--gray-text);margin:8px 0 0;padding-top:8px;
+    border-top:1px solid var(--gray-light);
+  }
   .ticker-time{
     font-size:11px;font-weight:600;padding:4px 9px;border-radius:7px;
     white-space:nowrap;display:flex;align-items:center;gap:4px;
@@ -224,20 +234,26 @@ function fmtFomcDate(dateStr){
   return days[d.getDay()] + " " + d.getDate() + " " + months[d.getMonth()];
 }
 
-async function fetchLogo(symbol){
-  const cacheKey = "logo_" + symbol;
+async function fetchProfile(symbol){
+  const cacheKey = "profile_" + symbol;
   const cached = cacheGet(cacheKey);
-  if(cached) return cached.logo;
+  if(cached) return cached;
   try{
     const url = BASE + "/stock/profile2?symbol=" + encodeURIComponent(symbol) + "&token=" + FINNHUB_KEY;
     const res = await fetch(url);
-    if(!res.ok) throw new Error("logo_fetch_failed");
+    if(!res.ok) throw new Error("profile_fetch_failed");
     const data = await res.json();
-    cacheSet(cacheKey, { logo: data.logo || "", fetchedAt: Date.now() });
-    return data.logo || "";
+    const profile = { logo: data.logo || "", beta: typeof data.beta === "number" ? data.beta : null, fetchedAt: Date.now() };
+    cacheSet(cacheKey, profile);
+    return profile;
   }catch(e){
-    return "";
+    return { logo: "", beta: null };
   }
+}
+
+async function fetchLogo(symbol){
+  const profile = await fetchProfile(symbol);
+  return profile.logo;
 }
 
 function renderWeekTabs(){
@@ -263,16 +279,36 @@ function timeBadge(hourTag){
   return '<span class="ticker-time na">Sin hora confirmada</span>';
 }
 
+function volatilityBadge(beta){
+  if(beta === null || beta === undefined) return "";
+  if(beta >= 1.5){
+    return '<span class="vol-badge high">&#128293; Alta volatilidad</span>';
+  }
+  if(beta >= 1.1){
+    return '<span class="vol-badge mid">&#9889; Volatilidad media</span>';
+  }
+  return "";
+}
+
 async function renderTickerCard(item){
   const card = document.createElement("div");
   card.className = "ticker-card";
-  const logoUrl = await fetchLogo(item.symbol);
+  const profile = await fetchProfile(item.symbol);
+  const epsLine = (item.epsEstimate !== null && item.epsEstimate !== undefined)
+    ? `<p class="eps-line">EPS estimado: $${Number(item.epsEstimate).toFixed(2)}</p>`
+    : "";
   card.innerHTML = `
-    <div class="ticker-left">
-      <div class="ticker-logo">${logoUrl ? `<img src="${logoUrl}" alt="${item.symbol}">` : `<span>${item.symbol.slice(0,4)}</span>`}</div>
-      <span class="ticker-sym">${item.symbol}</span>
+    <div class="ticker-row">
+      <div class="ticker-left">
+        <div class="ticker-logo">${profile.logo ? `<img src="${profile.logo}" alt="${item.symbol}">` : `<span>${item.symbol.slice(0,4)}</span>`}</div>
+        <div>
+          <span class="ticker-sym">${item.symbol}</span>
+          ${volatilityBadge(profile.beta)}
+        </div>
+      </div>
+      ${timeBadge(item.hour)}
     </div>
-    ${timeBadge(item.hour)}
+    ${epsLine}
   `;
   return card;
 }

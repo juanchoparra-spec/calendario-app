@@ -65,6 +65,18 @@
   .fomc-title{font-size:14px;font-weight:600;margin:0;}
   .fomc-card.has-event .fomc-title{color:#1A1A1A;font-weight:700;}
   .fomc-card.no-event .fomc-title{color:var(--gray-text);font-weight:500;}
+  .nfp-card{
+    display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;
+    margin-bottom:1.25rem;border:1.5px solid;
+  }
+  .nfp-card.has-event{background:#EAF3EC;border-color:#5B9C6E;}
+  .nfp-card.no-event{background:var(--gray-light);border-color:var(--border);}
+  .nfp-icon{font-size:22px;flex:0 0 auto;}
+  .nfp-title{font-size:14px;font-weight:600;margin:0;}
+  .nfp-card.has-event .nfp-title{color:#1A1A1A;font-weight:700;}
+  .nfp-card.no-event .nfp-title{color:var(--gray-text);font-weight:500;}
+  .nfp-sub{font-size:12px;margin:2px 0 0;}
+  .nfp-card.has-event .nfp-sub{color:#1A1A1A;font-weight:700;}
   .fomc-sub{font-size:12px;margin:2px 0 0;}
   .fomc-card.has-event .fomc-sub{color:#1A1A1A;font-weight:700;}
   .day-label{font-size:15px;font-weight:600;margin:0 0 8px;color:var(--text);}
@@ -222,9 +234,30 @@ const FOMC_2026 = [
   {start:"2026-12-08", end:"2026-12-09"}
 ];
 
+function firstFridayOfMonth(year, monthIndex){
+  const d = new Date(year, monthIndex, 1);
+  const day = d.getDay();
+  const offset = (5 - day + 7) % 7;
+  d.setDate(1 + offset);
+  return d;
+}
+
 function fomcInWeek(weekStart, weekEnd){
   const ws = toISO(weekStart), we = toISO(weekEnd);
   return FOMC_2026.find(m => m.end >= ws && m.start <= we) || null;
+}
+
+function nfpInWeek(weekStart, weekEnd){
+  const ws = toISO(weekStart), we = toISO(weekEnd);
+  const candidates = [
+    firstFridayOfMonth(weekStart.getFullYear(), weekStart.getMonth()),
+    firstFridayOfMonth(weekEnd.getFullYear(), weekEnd.getMonth())
+  ];
+  for(const c of candidates){
+    const cIso = toISO(c);
+    if(cIso >= ws && cIso <= we) return c;
+  }
+  return null;
 }
 
 function fmtFomcDate(dateStr){
@@ -235,20 +268,30 @@ function fmtFomcDate(dateStr){
 }
 
 async function fetchProfile(symbol){
-  const cacheKey = "profile_" + symbol;
+  const cacheKey = "profile3_" + symbol;
   const cached = cacheGet(cacheKey);
   if(cached) return cached;
+  let logo = "", beta = null;
   try{
     const url = BASE + "/stock/profile2?symbol=" + encodeURIComponent(symbol) + "&token=" + FINNHUB_KEY;
     const res = await fetch(url);
-    if(!res.ok) throw new Error("profile_fetch_failed");
-    const data = await res.json();
-    const profile = { logo: data.logo || "", beta: typeof data.beta === "number" ? data.beta : null, fetchedAt: Date.now() };
-    cacheSet(cacheKey, profile);
-    return profile;
-  }catch(e){
-    return { logo: "", beta: null };
-  }
+    if(res.ok){
+      const data = await res.json();
+      logo = data.logo || "";
+    }
+  }catch(e){}
+  try{
+    const url2 = BASE + "/stock/metric?symbol=" + encodeURIComponent(symbol) + "&metric=all&token=" + FINNHUB_KEY;
+    const res2 = await fetch(url2);
+    if(res2.ok){
+      const data2 = await res2.json();
+      const b = data2.metric && data2.metric.beta;
+      beta = typeof b === "number" ? b : null;
+    }
+  }catch(e){}
+  const profile = { logo, beta, fetchedAt: Date.now() };
+  cacheSet(cacheKey, profile);
+  return profile;
 }
 
 async function fetchLogo(symbol){
@@ -259,7 +302,7 @@ async function fetchLogo(symbol){
 function renderWeekTabs(){
   const wrap = document.getElementById("weekTabs");
   wrap.innerHTML = "";
-  const labels = ["Esta semana","Sem +1"];
+  const labels = ["Esta semana"];
   labels.forEach((lbl, i)=>{
     const btn = document.createElement("button");
     btn.className = "week-btn" + (i===currentWeek ? " active" : "");
@@ -364,6 +407,27 @@ async function loadWeek(force){
   }
   fomcArea.innerHTML = "";
   fomcArea.appendChild(fomcCard);
+
+  // NFP block (primer viernes del mes)
+  const nfpDate = nfpInWeek(start, end);
+  const nfpCard = document.createElement("div");
+  if(nfpDate){
+    nfpCard.className = "nfp-card has-event";
+    nfpCard.innerHTML = `
+      <div class="nfp-icon">&#128188;</div>
+      <div>
+        <p class="nfp-title">NFP: ${fmtFomcDate(toISO(nfpDate))}, 8:30 AM ET</p>
+        <p class="nfp-sub">Reporte de empleo (Nominas no agricolas)</p>
+      </div>
+    `;
+  } else {
+    nfpCard.className = "nfp-card no-event";
+    nfpCard.innerHTML = `
+      <div class="nfp-icon">&#128197;</div>
+      <p class="nfp-title">Sin reporte de empleo (NFP) esta semana</p>
+    `;
+  }
+  fomcArea.appendChild(nfpCard);
 
   // Earnings, filtered by watchlist + extra searched
   const allowed = new Set([...WATCHLIST, ...extraSearched]);

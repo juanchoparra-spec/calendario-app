@@ -77,8 +77,10 @@
   .nfp-card.no-event .nfp-title{color:var(--gray-text);font-weight:500;}
   .nfp-sub{font-size:12px;margin:2px 0 0;}
   .nfp-card.has-event .nfp-sub{color:#1A1A1A;font-weight:700;}
+  .nfp-impact{font-size:11px;margin:4px 0 0;color:#3B6D11;font-weight:600;}
   .fomc-sub{font-size:12px;margin:2px 0 0;}
   .fomc-card.has-event .fomc-sub{color:#1A1A1A;font-weight:700;}
+  .fomc-impact{font-size:11px;margin:4px 0 0;color:#8A2020;font-weight:600;}
   .day-label{font-size:15px;font-weight:600;margin:0 0 8px;color:var(--text);}
   .day-block{margin-bottom:14px;}
   .ticker-card{
@@ -396,6 +398,7 @@ async function loadWeek(force){
       <div>
         <p class="fomc-title">FOMC: ${fmtFomcDate(fomcMeeting.end)}, 2:00 PM ET</p>
         <p class="fomc-sub">Decision de tasas de interes</p>
+        <p class="fomc-impact">Impacta: SPY, QQQ, DIA, IWM, TLT, GLD</p>
       </div>
     `;
   } else {
@@ -418,6 +421,7 @@ async function loadWeek(force){
       <div>
         <p class="nfp-title">NFP: ${fmtFomcDate(toISO(nfpDate))}, 8:30 AM ET</p>
         <p class="nfp-sub">Reporte de empleo (Nominas no agricolas)</p>
+        <p class="nfp-impact">Impacta: SPY, QQQ, DIA, IWM, TLT, GLD</p>
       </div>
     `;
   } else {

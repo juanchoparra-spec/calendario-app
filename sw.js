@@ -1,4 +1,4 @@
-const CACHE_NAME = "calendariq-v8";
+const CACHE_NAME = "calendariq-v9";
 const ASSETS = [
   "./index.html",
   "./manifest.json",

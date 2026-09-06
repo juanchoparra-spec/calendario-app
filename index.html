@@ -78,6 +78,19 @@
   .nfp-sub{font-size:12px;margin:2px 0 0;}
   .nfp-card.has-event .nfp-sub{color:#1A1A1A;font-weight:700;}
   .nfp-impact{font-size:11px;margin:4px 0 0;color:#3B6D11;font-weight:600;}
+  .cpi-card{
+    display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;
+    margin-bottom:1.25rem;border:1.5px solid;
+  }
+  .cpi-card.has-event{background:#F0EAF7;border-color:#8B5FBF;}
+  .cpi-card.no-event{background:var(--gray-light);border-color:var(--border);}
+  .cpi-icon{font-size:22px;flex:0 0 auto;}
+  .cpi-title{font-size:14px;font-weight:600;margin:0;}
+  .cpi-card.has-event .cpi-title{color:#1A1A1A;font-weight:700;}
+  .cpi-card.no-event .cpi-title{color:var(--gray-text);font-weight:500;}
+  .cpi-sub{font-size:12px;margin:2px 0 0;}
+  .cpi-card.has-event .cpi-sub{color:#1A1A1A;font-weight:700;}
+  .cpi-impact{font-size:11px;margin:4px 0 0;color:#5B3A8A;font-weight:600;}
   .fomc-sub{font-size:12px;margin:2px 0 0;}
   .fomc-card.has-event .fomc-sub{color:#1A1A1A;font-weight:700;}
   .fomc-impact{font-size:11px;margin:4px 0 0;color:#8A2020;font-weight:600;}
@@ -235,6 +248,17 @@ const FOMC_2026 = [
   {start:"2026-10-27", end:"2026-10-28"},
   {start:"2026-12-08", end:"2026-12-09"}
 ];
+
+const CPI_2026 = [
+  "2026-01-13","2026-02-13","2026-03-11","2026-04-10","2026-05-12",
+  "2026-06-10","2026-07-14","2026-08-12","2026-09-11","2026-10-14",
+  "2026-11-10","2026-12-10"
+];
+
+function cpiInWeek(weekStart, weekEnd){
+  const ws = toISO(weekStart), we = toISO(weekEnd);
+  return CPI_2026.find(d => d >= ws && d <= we) || null;
+}
 
 function firstFridayOfMonth(year, monthIndex){
   const d = new Date(year, monthIndex, 1);
@@ -432,6 +456,28 @@ async function loadWeek(force){
     `;
   }
   fomcArea.appendChild(nfpCard);
+
+  // CPI block (fechas fijas oficiales BLS 2026)
+  const cpiDate = cpiInWeek(start, end);
+  const cpiCard = document.createElement("div");
+  if(cpiDate){
+    cpiCard.className = "cpi-card has-event";
+    cpiCard.innerHTML = `
+      <div class="cpi-icon">&#128200;</div>
+      <div>
+        <p class="cpi-title">CPI: ${fmtFomcDate(cpiDate)}, 8:30 AM ET</p>
+        <p class="cpi-sub">Indice de precios al consumidor (inflacion)</p>
+        <p class="cpi-impact">Impacta: SPY, QQQ, IWM</p>
+      </div>
+    `;
+  } else {
+    cpiCard.className = "cpi-card no-event";
+    cpiCard.innerHTML = `
+      <div class="cpi-icon">&#128197;</div>
+      <p class="cpi-title">Sin reporte de CPI esta semana</p>
+    `;
+  }
+  fomcArea.appendChild(cpiCard);
 
   // Earnings, filtered by watchlist + extra searched
   const allowed = new Set([...WATCHLIST, ...extraSearched]);

@@ -119,6 +119,16 @@
     font-size:11px;color:var(--gray-text);margin:8px 0 0;padding-top:8px;
     border-top:1px solid var(--gray-light);
   }
+  .eps-line.eps-actual{
+    margin-top:4px;padding-top:0;border-top:none;font-weight:600;color:var(--text);
+    display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  }
+  .eps-beat{color:#2E7D32;font-weight:700;}
+  .eps-miss{color:#B8452F;font-weight:700;}
+  .eps-inline{color:var(--gray-text);font-weight:600;}
+  .eps-reported{
+    font-size:10px;color:var(--gray-text);margin:4px 0 0;font-style:italic;
+  }
   .ticker-time{
     font-size:11px;font-weight:600;padding:4px 9px;border-radius:7px;
     white-space:nowrap;display:flex;align-items:center;gap:4px;
@@ -359,13 +369,43 @@ function volatilityBadge(beta){
   return "";
 }
 
+function epsBlock(item){
+  const hasEstimate = item.epsEstimate !== null && item.epsEstimate !== undefined;
+  const hasActual = item.epsActual !== null && item.epsActual !== undefined;
+
+  if(!hasEstimate && !hasActual) return "";
+
+  let lines = "";
+  if(hasEstimate){
+    lines += `<p class="eps-line">EPS estimado: $${Number(item.epsEstimate).toFixed(2)}</p>`;
+  }
+  if(hasActual){
+    const est = hasEstimate ? Number(item.epsEstimate) : null;
+    const act = Number(item.epsActual);
+    let resultTag = "";
+    if(est !== null){
+      if(act > est){
+        resultTag = `<span class="eps-beat">&#9989; Bate expectativas</span>`;
+      } else if(act < est){
+        resultTag = `<span class="eps-miss">&#10060; Falla expectativas</span>`;
+      } else {
+        resultTag = `<span class="eps-inline">&#8226; En linea</span>`;
+      }
+    }
+    lines += `<p class="eps-line eps-actual">EPS real: $${act.toFixed(2)} ${resultTag}</p>`;
+
+    const hourLabel = item.hour === "bmo" ? "antes apertura" : (item.hour === "amc" ? "despues cierre" : "");
+    const reportDate = fmtFomcDate(item.date);
+    lines += `<p class="eps-reported">Reportado: ${reportDate}${hourLabel ? " · " + hourLabel : ""}</p>`;
+  }
+  return lines;
+}
+
 async function renderTickerCard(item){
   const card = document.createElement("div");
   card.className = "ticker-card";
   const profile = await fetchProfile(item.symbol);
-  const epsLine = (item.epsEstimate !== null && item.epsEstimate !== undefined)
-    ? `<p class="eps-line">EPS estimado: $${Number(item.epsEstimate).toFixed(2)}</p>`
-    : "";
+  const epsLine = epsBlock(item);
   card.innerHTML = `
     <div class="ticker-row">
       <div class="ticker-left">
